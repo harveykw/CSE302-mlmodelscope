@@ -16,6 +16,8 @@ from . import datasets
 from .dataloader import DataLoader 
 from .load import load 
 
+import tensorflow as tf
+
 # https://stackoverflow.com/questions/714063/importing-modules-from-parent-folder 
 sys.path.insert(1, os.path.join(sys.path[0], '..')) 
 from pycupti import CUPTI 
@@ -80,7 +82,10 @@ class MLModelScope:
       import torch 
       self.no_grad = torch.no_grad 
     elif agent == 'tensorflow': 
-      raise NotImplementedError(f"{agent} agent is not supported") 
+      #raise NotImplementedError(f"{agent} agent is not supported") 
+      import tensorflow
+      # for layer in self.model.layers:
+      #   layer.trainable = False
     elif agent == 'onnxruntime': 
       raise NotImplementedError(f"{agent} agent is not supported") 
     else: 
@@ -101,6 +106,9 @@ class MLModelScope:
         # Making the code device-agnostic
         self.device = 'cuda' if ((self.architecture == "gpu") and torch.cuda.is_available()) else 'cpu' 
         self.model.model = self.model.model.to(self.device) 
+      if self.agent == 'tensorflow':
+        self.device = '/GPU:O' if ((self.architecture =="gpu") and tf.test.is_gpu_available()) else '/CPU:0'
+
 
     if self.agent == 'pytorch': 
       all_spans = {} 
@@ -130,6 +138,32 @@ class MLModelScope:
         layer.register_forward_hook(hook(layer_name)) 
 
     return 
+    
+    if self.agent == 'tensorflow':
+      def pre_hook(layer_name):
+        # This function will be called before the forward pass of a layer
+        # You can modify the inputs of the layer here, or do any other processing you need
+        print(f"Forward pass starting for layer {layer_name}")
+        return inputs 
+    
+      def hook(layer_name):
+          # This function will be called after the forward pass of a layer
+          # You can modify the outputs of the layer here, or do any other processing you need
+          print(f"Forward pass completed for layer {layer_name}")
+          return outputs
+      
+      completed_spans = [] 
+      open_spans = {} 
+      for layer in model.model.layers:
+          # Generate a unique name for the layer
+          layer_name = layer.name + '_' + layer.__class__.__name__
+          # Register a forward hook for the layer
+          layer._call_hook = functools.partial(hook, layer_name=layer_name)
+          # Register a forward pre hook for the layer
+          layer._call_pre_hook = functools.partial(pre_hook, layer_name=layer_name)
+      
+      for span in completed_spans:
+        print('name: {}, timing: {}'.format(span['name'], span['end_time'] - span['start_time']))
   
   def predict(self, num_warmup): 
     tracer = self.tracer 
@@ -157,7 +191,10 @@ class MLModelScope:
                   prop.inject(carrier=carrier, context=set_span_in_context(preprocess_span)) 
                   model_input = self.model.preprocess(data) 
                   if self.agent == 'pytorch': 
-                    model_input = model_input.to(self.device) 
+                    model_input = model_input.to(self.device)
+                  if self.agent == 'tensorflow':
+                    with tf.device(self.device):
+                      model_input = tf.identity(model_input) 
                 with tracer.start_as_current_span("predict") as predict_span: 
                   prop.inject(carrier=carrier, context=set_span_in_context(predict_span)) 
                   model_output = self.model.predict(model_input) 
@@ -173,6 +210,10 @@ class MLModelScope:
                 model_input = self.model.preprocess(data)
                 if self.agent == 'pytorch': 
                   model_input = model_input.to(self.device) 
+                if self.agent == 'tensorflow':
+                    with tf.device(self.device):
+                      model_input = tf.identity(model_input)
+                  #model_input = model_input.to(self.device)
               with tracer.start_as_current_span("predict") as predict_span:  
                 prop.inject(carrier=carrier, context=set_span_in_context(predict_span)) 
                 model_output = self.model.predict(model_input) 
