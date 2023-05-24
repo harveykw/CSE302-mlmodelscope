@@ -12,6 +12,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor 
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter 
 
+import json
 # from . import datasets 
 from .dataloader import DataLoader 
 from .load import load 
@@ -83,7 +84,7 @@ class MLModelScope:
     elif agent == 'tensorflow': 
       raise NotImplementedError(f"{agent} agent is not supported") 
     elif agent == 'onnxruntime': 
-      raise NotImplementedError(f"{agent} agent is not supported") 
+      pass
     else: 
       raise NotImplementedError(f"{agent} agent is not supported") 
     self.agent = agent 
@@ -179,7 +180,26 @@ class MLModelScope:
                 model_output = self.model.predict(model_input) 
               with tracer.start_as_current_span("postprocess") as postprocess_span: 
                 prop.inject(carrier=carrier, context=set_span_in_context(postprocess_span)) 
-                self.outputs.extend(self.model.postprocess(model_output)) 
+                self.outputs.extend(self.model.postprocess(model_output))
+        if self.agent == "onnxruntime":
+          prof_file = self.model.session.end_profiling()
+          if prof_file != ' ' and prof_file != '':
+            with open(prof_file, 'r') as f:
+              profile_data = json.load(f)
+            for entry in profile_data:
+              start_time_micros = entry['ts']
+              end_time = start_time_micros + entry['dur']
+              layer = entry['name']
+              with tracer.start_as_current_span(layer) as span:
+                # Store the start time and end time as attributes
+                span.set_attribute('start_time_micros', start_time_micros)
+                span.set_attribute('end_time_micros', end_time)
+            try:
+              os.remove(prof_file)
+            except FileNotFoundError:
+              print(f"The file '{prof_file}' does not exist.")
+            except Exception as e:
+              print(f"An error occurred while deleting the file: {str(e)}")
 
     if self.architecture == "gpu": 
       self.c.Close() 

@@ -50,8 +50,11 @@ def main():
   print("prediction is done\n") 
 
   print("outputs are as follows:") 
-  if task == "image_classification": 
-    print(np.argmax(outputs, axis=1)) 
+  if task == "image_classification":
+    if agent == "onnxruntime":
+      print(outputs)
+    else:
+      print(np.argmax(outputs, axis=1))
   else: 
     print(outputs) 
 

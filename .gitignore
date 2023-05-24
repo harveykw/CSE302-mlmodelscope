@@ -1,6 +1,7 @@
 # Temp directory to download model 
 mlmodelscope/pytorch_agent/tmp/
-
+mlmodelscope/onnxruntime_agent/model_files/
+mlmodelscope/.idea
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
