@@ -52,6 +52,8 @@ class PyTorch_Agent:
       pass
     elif task == "talking_head_generation":
       pass
+    elif task == "eye_contact_detection":
+      pass
     else: 
       raise NotImplementedError(f"{task} task is not supported")  
 
@@ -65,8 +67,16 @@ class PyTorch_Agent:
     self.model_name = model_name 
 
     with self.tracer.start_as_current_span(self.model_name + ' model load', context=self.ctx) as model_load_span: 
-      self.prop.inject(carrier=self.carrier, context=set_span_in_context(model_load_span)) 
-      self.model = _load(task=task, model_name=self.model_name, security_check=security_check) 
+      self.prop.inject(carrier=self.carrier, context=set_span_in_context(model_load_span))
+      
+      self.model = _load(task=task, model_name=self.model_name, security_check=security_check)
+      
+
+
+
+
+
+      
       if hasattr(self.model, 'model'):
         self.model.model.eval()
         self.model.model = self.model.model.to(self.device) 
@@ -139,7 +149,7 @@ class PyTorch_Agent:
           for index, data in enumerate(dataloader):
             with tracer.start_as_current_span(f"Evaluate Batch {index}"):  
               with tracer.start_as_current_span("preprocess") as preprocess_span: 
-                prop.inject(carrier=carrier, context=set_span_in_context(preprocess_span)) 
+                prop.inject(carrier=carrier, context=set_span_in_context(preprocess_span))
                 model_input = self.model.preprocess(data)
                 if hasattr(model_input, 'to'):
                   model_input = model_input.to(self.device) 

@@ -91,5 +91,6 @@ def _load(task, model_name, security_check=True):
     exec(f'from .models.{task}.' + model_name + ' import init', globals())
     return init()
   except ImportError as e:
+    print(e)
     if e.msg.split()[3] == "'init'": 
       return create_instance_from_model_manifest_file(task, model_name, security_check) # Create an instance of the model class 

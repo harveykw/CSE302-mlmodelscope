@@ -8,26 +8,33 @@ import torchvision
 from torchvision import datasets, transforms
 import pandas as pd
 import numpy as np
+import os, sys, time
+sys.path.append(os.path.dirname(__file__))
 from model import model_static
 from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 from colour import Color
+sys.path.pop()
 
 
-parser = argparse.ArgumentParser()
+#parser = argparse.ArgumentParser()
 
-parser.add_argument('--video', type=str, help='input video path. live cam is used when not specified')
-parser.add_argument('--face', type=str, help='face detection file path. dlib face detector is used when not specified')
-parser.add_argument('--model_weight', type=str, help='path to model weights file', default='data/model_weights.pkl')
-parser.add_argument('--jitter', type=int, help='jitter bbox n times, and average results', default=0)
-parser.add_argument('-save_vis', help='saves output as video', action='store_true')
-parser.add_argument('-save_text', help='saves output as text', action='store_true')
-parser.add_argument('-display_off', help='do not display frames', action='store_true')
+#parser.add_argument('--video', type=str, help='input video path. live cam is used when not specified')
+#parser.add_argument('--face', type=str, help='face detection file path. dlib face detector is used when not specified')
+#parser.add_argument('--model_weight', type=str, help='path to model weights file', default='data/model_weights.pkl')
+#parser.add_argument('--jitter', type=int, help='jitter bbox n times, and average results', default=0)
+#parser.add_argument('-save_vis', help='saves output as video', action='store_true')
+#parser.add_argument('-save_text', help='saves output as text', action='store_true')
+#parser.add_argument('-display_off', help='do not display frames', action='store_true')
 
-args = parser.parse_args()
+#args = parser.parse_args()
 
-CNN_FACE_MODEL = 'data/mmod_human_face_detector.dat' # from http://dlib.net/files/mmod_human_face_detector.dat.bz2
+current_dir = os.path.dirname(__file__)
+font_path = os.path.join(current_dir, 'data', 'arial.ttf')
+cnn_model_path = os.path.join(current_dir, 'data', 'mmod_human_face_detector.dat')
+
+CNN_FACE_MODEL = cnn_model_path # from http://dlib.net/files/mmod_human_face_detector.dat.bz2
 
 
 def bbox_jitter(bbox_left, bbox_top, bbox_right, bbox_bottom):
@@ -48,10 +55,12 @@ def drawrect(drawcontext, xy, outline=None, width=0):
 
 
 def run(video_path, face_path, model_weight, jitter, vis, display_off, save_text):
+    print("\nStarted Model")
     # set up vis settings
     red = Color("red")
     colors = list(red.range_to(Color("green"),10))
-    font = ImageFont.truetype("data/arial.ttf", 40)
+    font = ImageFont.truetype(font_path, 40)
+        #font = ImageFont.load_default()
 
     # set up video source
     if video_path is None:
@@ -61,11 +70,18 @@ def run(video_path, face_path, model_weight, jitter, vis, display_off, save_text
         cap = cv2.VideoCapture(video_path)
 
     # set up output file
+    video_dir = os.path.dirname(video_path)
+    output_dir_name = "outputs"
+    outputs_path = os.path.join(video_dir, output_dir_name)
+    if not os.path.exists(outputs_path):
+        os.makedirs(outputs_path)
+
+    
     if save_text:
-        outtext_name = os.path.basename(video_path).replace('.avi','_output.txt')
+        outtext_name = os.path.join(outputs_path, os.path.basename(video_path).replace('.avi', '_output.txt'))
         f = open(outtext_name, "w")
     if vis:
-        outvis_name = os.path.basename(video_path).replace('.avi','_output.avi')
+        outvis_name = os.path.join(outputs_path, os.path.basename(video_path).replace('.avi', '_output.avi'))
         imwidth = int(cap.get(3)); imheight = int(cap.get(4))
         outvid = cv2.VideoWriter(outvis_name,cv2.VideoWriter_fourcc('M','J','P','G'), cap.get(5), (imwidth,imheight))
 
@@ -98,9 +114,11 @@ def run(video_path, face_path, model_weight, jitter, vis, display_off, save_text
                                          transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 
     # load model weights
-    model = model_static(model_weight)
+    proper_model_weight_path = os.path.join(current_dir, 'data', 'model_weights.pkl')
+
+    model = model_static(proper_model_weight_path)
     model_dict = model.state_dict()
-    snapshot = torch.load(model_weight)
+    snapshot = torch.load(proper_model_weight_path)
     model_dict.update(snapshot)
     model.load_state_dict(model_dict)
 
@@ -180,5 +198,5 @@ def run(video_path, face_path, model_weight, jitter, vis, display_off, save_text
     print ('DONE!')
 
 
-if __name__ == "__main__":
-    run(args.video, args.face, args.model_weight, args.jitter, args.save_vis, args.display_off, args.save_text)
+#if __name__ == "__main__":
+    #run(video, face, model_weight, jitter, save_vis, display_off, save_text)
