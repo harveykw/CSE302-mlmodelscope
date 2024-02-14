@@ -34,7 +34,7 @@ class Eye_Contact_CNN(PyTorchAbstractClass):
     
     def postprocess(self, model_output):
         print("\nYour outputs are saved at: pydldataset/datasets/tmp/eye_contact_detection_data/outputs!\n")
-        return 0
+        return [0]
 
 
     
